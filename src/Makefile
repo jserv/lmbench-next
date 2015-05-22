@@ -12,7 +12,7 @@ INSTALL_PATH = /usr/local
 OS = arm-uclinux
 O = ../bin/$(OS)
 CONFIG = ../bin/$(OS)/`../scripts/config`
-CFLAGS = -O2 -DRUSAGE -DHAVE_uint=1 -DHAVE_int64_t=1 -DHAVE_socklen_t -DHAVE_DRAND48 -DHAVE_SCHED_SETAFFINITY=1
+CFLAGS = -Os -DRUSAGE -DHAVE_uint=1 -DHAVE_int64_t=1 -DHAVE_socklen_t -DHAVE_DRAND48 -DHAVE_SCHED_SETAFFINITY=1
 LDFLAGS = -Wl,-s 
 LDLIBS = $(O)/lmbench.a -lm
 
