@@ -50,9 +50,13 @@ main(int ac, char **av)
 	while (( c = getopt(ac, av, "sS:m:M:P:W:N:")) != EOF) {
 		switch(c) {
 		case 's': /* Server */
+#ifdef CONFIG_NOMMU
+			server_main();
+#else
 			if (fork() == 0) {
 				server_main();
 			}
+#endif
 			exit(0);
 			break;
 		case 'S': /* shutdown serverhost */
@@ -192,13 +196,21 @@ server_main()
 	signal(SIGCHLD, sigchld_wait_handler);
 	for ( ;; ) {
 		newdata = tcp_accept(data, SOCKOPT_WRITE);
+#ifdef CONFIG_NOMMU
+		switch (vfork()) {
+#else
 		switch (fork()) {
+#endif
 		    case -1:
 			perror("fork");
 			break;
 		    case 0:
 			source(newdata);
+#ifdef CONFIG_NOMMU
+			_exit(0);
+#else
 			exit(0);
+#endif
 		    default:
 			close(newdata);
 			break;

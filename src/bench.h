@@ -68,6 +68,10 @@ typedef int64 off64_t;
 #include	"lib_udp.h"
 #include	"lib_unix.h"
 
+#ifdef CONFIG_NOMMU
+#include <sched.h>
+#define STACK_SIZE 4096
+#endif
 
 #ifdef	DEBUG
 #	define		debug(x) fprintf x

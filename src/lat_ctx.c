@@ -218,6 +218,36 @@ initialize(iter_t iterations, void* cookie)
 	}
 }
 
+#ifdef CONFIG_NOMMU
+struct ctx_thread_data {
+	char            stack[STACK_SIZE];
+	int             **p;
+	int             process_size;
+	long            i;
+	int             procs;
+};
+
+static struct ctx_thread_data *pcthda = NULL;
+
+int
+ctx_thread_function(void *t)
+{
+	struct ctx_thread_data *pthd;
+	int j;
+	if(t == NULL)
+		return -1;
+	pthd = (struct ctx_thread_data *)t;
+
+	handle_scheduler(benchmp_childid(), pthd->i, pthd->procs-1);
+	for (j = 0; j < pthd->procs; ++j) {
+		if (j != pthd->i - 1) close(pthd->p[j][0]);
+		if (j != pthd->i) close(pthd->p[j][1]);
+	}
+	doit(pthd->p[pthd->i-1][0], pthd->p[pthd->i][1], pthd->process_size);
+	return 0;
+}
+#endif
+
 void
 cleanup(iter_t iterations, void* cookie)
 {
@@ -238,6 +268,9 @@ cleanup(iter_t iterations, void* cookie)
 	}
 	if (pState->pids)
 		free(pState->pids);
+#ifdef CONFIG_NOMMU
+	if (pcthda) free(pcthda);
+#endif
 	pState->pids = NULL;
 }
 
@@ -301,6 +334,12 @@ create_daemons(int **p, pid_t *pids, int procs, int process_size)
 {
 	int	i, j;
 	int	msg;
+#ifdef CONFIG_NOMMU
+	pcthda = NULL;
+	pcthda = (struct ctx_thread_data *)malloc(procs * sizeof(struct ctx_thread_data));
+	if (!pcthda)
+		return -1;
+#endif
 
 	/*
 	 * Use the pipes as a ring, and fork off a bunch of processes
@@ -310,6 +349,15 @@ create_daemons(int **p, pid_t *pids, int procs, int process_size)
 	 */
 	handle_scheduler(benchmp_childid(), 0, procs-1);
      	for (i = 1; i < procs; ++i) {
+#ifdef CONFIG_NOMMU
+		pcthda[i].p = p;
+		pcthda[i].process_size = process_size;
+		pcthda[i].procs = procs;
+		pcthda[i].i = i;
+		pids[i] = clone(ctx_thread_function, pcthda[i].stack + STACK_SIZE - 4, CLONE_VM|SIGCHLD, &(pcthda[i]));
+		if (pids[i] < 0)
+			free(pcthda);
+#else
 		switch (pids[i] = fork()) {
 		    case -1:	/* could not fork, out of processes? */
 			return i;
@@ -326,6 +374,7 @@ create_daemons(int **p, pid_t *pids, int procs, int process_size)
 		    default:	/* parent */
 			;
 	    	}
+#endif
 	}
 
 	/*
@@ -335,6 +384,9 @@ create_daemons(int **p, pid_t *pids, int procs, int process_size)
 	if (write(p[0][1], &msg, sizeof(msg)) != sizeof(msg) ||
 	    read(p[procs-1][0], &msg, sizeof(msg)) != sizeof(msg)) {
 		/* perror("write/read/write on pipe"); */
+#ifdef CONFIG_NOMMU
+		if (pcthda) free(pcthda);
+#endif
 		exit(1);
 	}
 	return procs;

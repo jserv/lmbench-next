@@ -1,7 +1,7 @@
 # Makefile for top level of lmbench
 SHELL = /bin/sh
 MAKE = make
-OS = $(shell scripts/os)
+OS = arm-uclinux
 
 build:
 	@mkdir -p bin/$(OS)

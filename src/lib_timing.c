@@ -186,6 +186,54 @@ benchmp_parent(int response,
 int
 sizeof_result(int repetitions);
 
+#ifdef CONFIG_NOMMU
+struct thread_data {
+	char stack[STACK_SIZE];
+	benchmp_f initialize;
+	benchmp_f benchmark;
+	benchmp_f cleanup;
+	long i;
+	int response[2];
+	int start_signal[2];
+	int result_signal[2];
+	int exit_signal[2];
+	int enough;
+	iter_t iterations;
+	int parallel;
+	int repetitions;
+	void* cookie;
+};
+
+int
+thread_function(void *p)
+{
+	struct thread_data *pthd;
+
+	if (p == NULL)
+		return -1;
+	pthd = (struct thread_data *)p;
+	close(pthd->response[0]);
+	close(pthd->start_signal[1]);
+	close(pthd->result_signal[1]);
+	close(pthd->exit_signal[1]);
+	handle_scheduler(pthd->i, 0, 0);
+	benchmp_child(pthd->initialize,
+			pthd->benchmark,
+			pthd->cleanup,
+			pthd->i,
+			pthd->response[1],
+			pthd->start_signal[0],
+			pthd->result_signal[0],
+			pthd->exit_signal[0],
+			pthd->enough,
+			pthd->iterations,
+			pthd->parallel,
+			pthd->repetitions,
+			pthd->cookie
+		     );
+	return 0;
+}
+#endif
 void 
 benchmp(benchmp_f initialize, 
 	benchmp_f benchmark,
@@ -203,6 +251,13 @@ benchmp(benchmp_f initialize,
 	int		start_signal[2];
 	int		result_signal[2];
 	int		exit_signal[2];
+
+#ifdef CONFIG_NOMMU
+	struct thread_data *pthd = NULL;
+	pthd = (struct thread_data *)malloc(parallel * sizeof(struct thread_data));
+	if (!pthd)
+		return;
+#endif
 
 #ifdef _DEBUG
 	fprintf(stderr, "benchmp(%p, %p, %p, %d, %d, %d, %d, %p): entering\n", initialize, benchmark, cleanup, enough, parallel, warmup, repetitions, cookie);
@@ -265,6 +320,30 @@ benchmp(benchmp_f initialize,
 #ifdef _DEBUG
 		fprintf(stderr, "benchmp(%p, %p, %p, %d, %d, %d, %d, %p): creating child %d\n", initialize, benchmark, cleanup, enough, parallel, warmup, repetitions, cookie, i);
 #endif
+
+#ifdef CONFIG_NOMMU
+		pthd[i].initialize = initialize;
+		pthd[i].benchmark = benchmark;
+		pthd[i].cleanup = cleanup;
+		pthd[i].i = i;
+		pthd[i].response[0] = response[0];
+		pthd[i].response[1] = response[1];
+		pthd[i].start_signal[0] = start_signal[0];
+		pthd[i].start_signal[1] = start_signal[1];
+		pthd[i].result_signal[0] = result_signal[0];
+		pthd[i].result_signal[1] = result_signal[1];
+		pthd[i].exit_signal[0] = exit_signal[0];
+		pthd[i].exit_signal[1] = exit_signal[1];
+		pthd[i].enough = enough;
+		pthd[i].iterations = iterations;
+		pthd[i].parallel = parallel;
+		pthd[i].repetitions = repetitions;
+		pthd[i].cookie = cookie;
+
+		pids[i] = clone(thread_function, pthd[i].stack + STACK_SIZE - 4, CLONE_VM|SIGCHLD, &(pthd[i]));
+		if (pids[i]<0)
+			free(pthd);
+#else
 		switch(pids[i] = fork()) {
 		case -1:
 			/* could not open enough children! */
@@ -297,6 +376,7 @@ benchmp(benchmp_f initialize,
 		default:
 			break;
 		}
+#endif
 	}
 	close(response[1]);
 	close(start_signal[0]);
@@ -353,6 +433,9 @@ cleanup_exit:
 	}
 
 	if (pids) free(pids);
+#ifdef CONFIG_NOMMU
+	if (pthd) free(pthd);
+#endif
 #ifdef _DEBUG
 	fprintf(stderr, "benchmp(0x%x, 0x%x, 0x%x, %d, %d, 0x%x): exiting\n", (unsigned int)initialize, (unsigned int)benchmark, (unsigned int)cleanup, enough, parallel, (unsigned int)cookie);
 #endif

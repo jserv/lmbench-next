@@ -9,12 +9,20 @@ ARCREATE = cr
 RANLIB = ranlib
 
 INSTALL_PATH = /usr/local
-OS = $(shell ../scripts/os)
+OS = arm-uclinux
 O = ../bin/$(OS)
 CONFIG = ../bin/$(OS)/`../scripts/config`
 CFLAGS = -O2 -DRUSAGE -DHAVE_uint=1 -DHAVE_int64_t=1 -DHAVE_socklen_t -DHAVE_DRAND48 -DHAVE_SCHED_SETAFFINITY=1
 LDFLAGS = -Wl,-s 
 LDLIBS = $(O)/lmbench.a -lm
+
+# ARM architecture
+ARCH = arm
+CFLAGS += -march=armv7-m -mthumb -mtune=cortex-m3
+
+# uClinux specific
+CFLAGS += -DCONFIG_NOMMU
+LDFLAGS += -Wl,-elf2flt=-s -Wl,-elf2flt=16348
 
 INCS =	bench.h lib_mem.h lib_tcp.h lib_udp.h stats.h timing.h		\
 	lib_debug.h lib_unix.h names.h

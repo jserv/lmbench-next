@@ -29,6 +29,21 @@ struct _state {
 	int	initerr;
 };
 
+#ifdef CONFIG_NOMMU
+static char thd_stack[STACK_SIZE];
+
+int
+bw_unix_thread_function(void *t)
+{
+	struct _state*  state = (struct _state*)t;
+	handle_scheduler(benchmp_childid(), 1, 1);
+	close(state->control[1]);
+	close(state->pipes[0]);
+	writer(state->control[0], state->pipes[1], state->buf, state);
+	return 0;
+}
+#endif
+
 void 
 initialize(iter_t iterations, void* cookie)
 {
@@ -50,6 +65,9 @@ initialize(iter_t iterations, void* cookie)
 		return;
 	}
 	handle_scheduler(benchmp_childid(), 0, 1);
+#ifdef CONFIG_NOMMU
+	state->pid = clone(bw_unix_thread_function, thd_stack + STACK_SIZE - 4, CLONE_VM|SIGCHLD, state);
+#else
 	switch (state->pid = fork()) {
 	    case 0:
 	      handle_scheduler(benchmp_childid(), 1, 1);
@@ -68,6 +86,7 @@ initialize(iter_t iterations, void* cookie)
 	    default:
 		break;
 	}
+#endif
 	close(state->control[0]);
 	close(state->pipes[1]);
 }

@@ -33,6 +33,10 @@ main(int ac, char **av)
 	int c;
 	char* usage = "[-P <parallelism>] [-W <warmup>] [-N <repetitions>]\n";
 
+#ifdef CONFIG_NOMMU
+	printf("Not supported in NOMMU architecture.\n");
+	return 0;
+#endif
 	while (( c = getopt(ac, av, "P:W:N:")) != EOF) {
 		switch(c) {
 		case 'P':
@@ -62,6 +66,7 @@ main(int ac, char **av)
 	return (0);
 }
 
+#if !defined(CONFIG_NOMMU)
 void 
 initialize(iter_t iterations, void* cookie)
 {
@@ -90,6 +95,7 @@ initialize(iter_t iterations, void* cookie)
 		break;
 	}
 }
+#endif
 
 void 
 cleanup(iter_t iterations, void* cookie)

@@ -94,6 +94,29 @@ main(int ac, char **av)
 	exit(0);
 }
 
+#ifdef CONFIG_NOMMU
+struct sel_thread_data {
+	char stack[STACK_SIZE];
+	int pid;
+	struct _state*  state;
+};
+
+static struct sel_thread_data thda;
+
+int
+sel_thread_function(void *t)
+{
+	struct sel_thread_data *pthd = (struct sel_thread_data*)t;
+	/* child server process */
+	while (pthd->pid == getppid()) {
+		int newsock = tcp_accept(pthd->state->sock, SOCKOPT_NONE);
+		read(newsock, &(pthd->state->fid), 1);
+		close(newsock);
+	}
+	return 0;
+}
+#endif
+
 void
 server(void* cookie)
 {
@@ -125,6 +148,11 @@ server(void* cookie)
 	}
 
 	/* Start a server process to accept client connections */
+#ifdef CONFIG_NOMMU
+	thda.state = state;
+	thda.pid = pid;
+	state->pid = clone(sel_thread_function, thda.stack + STACK_SIZE - 4, CLONE_VM|SIGCHLD, &thda);
+#else
 	switch(state->pid = fork()) {
 	case 0:
 		/* child server process */
@@ -143,6 +171,7 @@ server(void* cookie)
 	default:
 		break;
 	}
+#endif
 }
 
 int

@@ -66,6 +66,24 @@ main(int ac, char **av)
 	return(0);
 }
 
+#ifdef CONFIG_NOMMU
+static char thd_stack[STACK_SIZE];
+
+int
+unix_thread_function(void *t)
+{
+	struct _state*  pState = (struct _state*)t;
+	handle_scheduler(benchmp_childid(), 1, 1);
+
+	/* Child sits and ping-pongs packets back to parent */
+	signal(SIGTERM, exit);
+	while (read(pState->sv[0], pState->buf, pState->msize) == pState->msize) {
+		write(pState->sv[0], pState->buf, pState->msize);
+	}
+	return 0;
+}
+#endif
+
 void
 initialize(iter_t iterations, void* cookie)
 {
@@ -85,6 +103,10 @@ initialize(iter_t iterations, void* cookie)
 	}
 	handle_scheduler(benchmp_childid(), 0, 1);
 
+#ifdef CONFIG_NOMMU
+	pState->pid = clone(unix_thread_function, thd_stack + STACK_SIZE - 4, CLONE_VM|SIGCHLD, pState);
+	return;
+#else
 	if (pState->pid = fork())
 		return;
 
@@ -98,6 +120,7 @@ initialize(iter_t iterations, void* cookie)
 			DIE_PERROR("write failed");
 	}
 	exit(0);
+#endif
 }
 
 void

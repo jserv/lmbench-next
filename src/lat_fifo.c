@@ -65,6 +65,21 @@ main(int ac, char **av)
 	return (0);
 }
 
+#ifdef CONFIG_NOMMU
+static char thd_stack[STACK_SIZE];
+
+int
+fifo_thread_function(void *t)
+{
+	struct _state*  state = (struct _state*)t;
+	handle_scheduler(benchmp_childid(), 1, 1);
+	state->rd = open(state->filename1, O_RDONLY);
+	state->wr = open(state->filename2, O_WRONLY);
+	writer(state->wr, state->rd);
+	return 0;
+}
+#endif
+
 void 
 initialize(iter_t iterations, void *cookie)
 {
@@ -84,6 +99,9 @@ initialize(iter_t iterations, void *cookie)
 		exit(1);
 	}
 	handle_scheduler(benchmp_childid(), 0, 1);
+#ifdef CONFIG_NOMMU
+	state->pid = clone(fifo_thread_function, thd_stack + STACK_SIZE - 4, CLONE_VM|SIGCHLD, state);
+#else
 	switch (state->pid = fork()) {
 	    case 0:
 		handle_scheduler(benchmp_childid(), 1, 1);
@@ -101,6 +119,7 @@ initialize(iter_t iterations, void *cookie)
 		state->rd = open(state->filename2, O_RDONLY);
 		break;
 	}
+#endif
 
 	/*
 	 * One time around to make sure both processes are started.

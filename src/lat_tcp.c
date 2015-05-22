@@ -44,9 +44,13 @@ main(int ac, char **av)
 	while (( c = getopt(ac, av, "sS:m:P:W:N:")) != EOF) {
 		switch(c) {
 		case 's': /* Server */
+#ifdef CONFIG_NOMMU
+			server_main();
+#else
 			if (fork() == 0) {
 				server_main();
 			}
+#endif
 			exit(0);
 		case 'S': /* shutdown serverhost */
 			state.sock = tcp_connect(optarg,
@@ -146,13 +150,21 @@ server_main()
 
 	for (;;) {
 		newsock = tcp_accept(sock, SOCKOPT_NONE);
+#ifdef CONFIG_NOMMU
+		switch (vfork()) {
+#else
 		switch (fork()) {
+#endif
 		    case -1:
 			perror("fork");
 			break;
 		    case 0:
 			doserver(newsock);
+#ifdef CONFIG_NOMMU
+			_exit(0);
+#else
 			exit(0);
+#endif
 		    default:
 			close(newsock);
 			break;
