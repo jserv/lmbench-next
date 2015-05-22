@@ -18,7 +18,7 @@ LDLIBS = $(O)/lmbench.a -lm
 
 # ARM architecture
 ARCH = arm
-CFLAGS += -march=armv7-m -mthumb -mtune=cortex-m3
+CFLAGS += -march=armv7-m -mthumb -mcpu=cortex-m3
 
 # uClinux specific
 CFLAGS += -DCONFIG_NOMMU
