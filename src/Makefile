@@ -22,7 +22,7 @@ CFLAGS += -march=armv7-m -mthumb -mtune=cortex-m3
 
 # uClinux specific
 CFLAGS += -DCONFIG_NOMMU
-LDFLAGS += -Wl,-elf2flt=-s -Wl,-elf2flt=16348
+CFLAGS += -Wl,-elf2flt=-s -Wl,-elf2flt=16348
 
 INCS =	bench.h lib_mem.h lib_tcp.h lib_udp.h stats.h timing.h		\
 	lib_debug.h lib_unix.h names.h
